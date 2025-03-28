@@ -125,7 +125,7 @@ client.on('messageCreate', async (message) => {
         color: 0xFF69B4, // Adjust as needed
         title: `Dreamspace Detected`,
         thumbnail: {
-          url: 'https://raw.githubusercontent.com/MOBILERVERISON/Glitch-pfp/refs/heads/main/Picsart_25-03-28_08-32-58-220.jpg' // Your thumbnail URL
+          url: 'https://raw.githubusercontent.com/eternals924/Glitch-Dreamspace-sniper/refs/heads/main/DREAMSPACE.png' // Your thumbnail URL
         },
         fields: [
           {
