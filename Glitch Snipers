@@ -1,0 +1,213 @@
+const { Client } = require('discord.js-selfbot-v13');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const fs = require('fs');
+
+const client = new Client();
+
+const allowedChannels = [
+  '1352152911009939526', // Updated channel ID
+];
+
+// Path to store glitch spam data and blacklisted users
+const glitchSpamDataPath = './glitch_spam.json';
+const blacklistUsersPath = './blacklistuser.json';
+const blacklistWordsPath = './blacklistword.json'; // Path for blacklisted words
+
+// Define your glitch ping role ID
+const glitchPingRoleId = '1347995682572603422'; // Your glitch ping role ID
+
+// Function to load glitch spam data from JSON
+function loadGlitchSpam() {
+  if (fs.existsSync(glitchSpamDataPath)) {
+    return JSON.parse(fs.readFileSync(glitchSpamDataPath, 'utf8'));
+  }
+  return {};
+}
+
+// Function to save glitch spam data to the file
+function saveGlitchSpam(data) {
+  fs.writeFileSync(glitchSpamDataPath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Function to load blacklist user IDs
+function loadBlacklistUsers() {
+  if (fs.existsSync(blacklistUsersPath)) {
+    return JSON.parse(fs.readFileSync(blacklistUsersPath, 'utf8'));
+  }
+  return [];
+}
+
+// Function to save blacklist user IDs
+function saveBlacklistUsers(data) {
+  fs.writeFileSync(blacklistUsersPath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Function to load blacklisted words
+function loadBlacklistWords() {
+  if (fs.existsSync(blacklistWordsPath)) {
+    return JSON.parse(fs.readFileSync(blacklistWordsPath, 'utf8'));
+  }
+  return [];
+}
+
+// Function to save blacklisted words
+function saveBlacklistWords(data) {
+  fs.writeFileSync(blacklistWordsPath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Function to detect variations of "glitch"
+function isGlitchWord(content) {
+  const glitchPatterns = [
+    /\bglitch\w*\b/i,
+    /g+l+i+t+c+h+\b/i,
+    /g+l+i+t+h+\b/i
+  ];
+  return glitchPatterns.some((pattern) => pattern.test(content));
+}
+
+// Function to match Roblox private server link
+function extractPrivateServerLink(content) {
+  const regex = /https:\/\/www\.roblox\.com\/games\/\d+\?privateServerLinkCode=[a-zA-Z0-9]+/i;
+  return content.match(regex) ? content.match(regex)[0] : null;
+}
+
+// Function to match Roblox share link
+function extractShareLink(content) {
+  const regex = /https:\/\/www\.roblox\.com\/share\?code=[a-zA-Z0-9]+&type=server/i;
+  return content.match(regex) ? content.match(regex)[0] : null;
+}
+
+client.on('ready', () => {
+  console.log(`${client.user.username} is ready!`);
+});
+
+// Event listener for new messages
+client.on('messageCreate', async (message) => {
+  if (message.author.id === client.user.id) return; // Ignore self-messages
+  if (!allowedChannels.includes(message.channel.id)) return; // Ignore other channels
+
+  const content = message.content.toLowerCase();
+  console.log(`Received message: ${content}`);
+
+  // Load blacklisted words
+  const blacklistedWords = loadBlacklistWords();
+
+  // Check if the message contains blacklisted words
+  if (blacklistedWords.some((word) => content.includes(word.toLowerCase()))) {
+    console.log("Message contains blacklisted word, ignoring...");
+    return; // Ignore message if it contains a blacklisted word
+  }
+
+  // Check for "glitch" and a valid Roblox link
+  const containsGlitch = isGlitchWord(content);
+  const privateServerLink = extractPrivateServerLink(content);
+  const shareLink = extractShareLink(content);
+
+  if (containsGlitch && (privateServerLink || shareLink)) {
+    let glitchSpamData = loadGlitchSpam();
+    const lastAttempt = glitchSpamData[message.author.id] || 0;
+    const timeSinceLastAttempt = Date.now() - lastAttempt;
+
+    if (timeSinceLastAttempt < 2 * 60 * 1000) { // 2 minutes cooldown
+      return; // Ignore if spamming
+    }
+
+    glitchSpamData[message.author.id] = Date.now(); // Update timestamp for the user
+    saveGlitchSpam(glitchSpamData); // Save the updated data
+
+    const webhookURL = 'https://discord.com/api/webhooks/1352156074668720249/EoSzVht3SXO7a802qHY8_fCJ_Q4hX2ASgviQWNhtlFMfhnJqCPp4p_qE102dRmv4VVqT'; // New webhook URL
+
+    const messageLink = `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`; // Create message link
+
+    const payload = {
+      content: `<@&${glitchPingRoleId}>`, // Glitch ping role
+      username: 'Glitch Snipes',
+      embeds: [{
+        color: 0x2e7d32, // Adjust as needed
+        title: `Glitch Detected`,
+        thumbnail: {
+          url: 'https://raw.githubusercontent.com/MOBILERVERISON/Glitch-pfp/refs/heads/main/GLITCHED.webp' // Your thumbnail URL
+        },
+        fields: [
+          {
+            name: 'Glitch Poster',
+            value: `${messageLink}`, // Clickable link instead of raw message
+            inline: false
+          },
+          {
+            name: 'User',
+            value: `<@${message.author.id}> | (${message.author.id})`,
+            inline: true
+          },
+          {
+            name: 'Private Server Link',
+            value: privateServerLink || shareLink || 'No link detected',
+            inline: false
+          },
+          {
+            name: 'Content',
+            value: `\`\`\`${content}\`\`\``, // Content in code block format
+            inline: false
+          }
+        ],
+        footer: {
+          text: `Developed by Termux`, // Server info
+        },
+        timestamp: new Date(),
+      }]
+    };
+
+    try {
+      const response = await fetch(webhookURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        console.log("Message sent to webhook.");
+      } else {
+        console.error("Failed to send message, status: " + response.status);
+      }
+    } catch (err) {
+      console.error("Error sending to webhook:", err);
+    }
+  } else {
+    console.log("No glitch or valid Roblox link detected.");
+  }
+});
+
+// Event listener for message deletion (blacklist user when deleting message)
+client.on('messageDelete', async (message) => {
+  if (!message || !message.author || !message.author.id) return; // Ensure valid message data
+
+  if (message.author.id === client.user.id) return;
+  if (!allowedChannels.includes(message.channel.id)) return;
+
+  const content = message.content.toLowerCase();
+  const blacklistUsers = loadBlacklistUsers();
+
+  if (blacklistUsers.includes(message.author.id)) return; // Ignore already blacklisted users
+
+  if (content.includes('glitch') || content.includes('roblox')) {
+    blacklistUsers.push(message.author.id);
+    saveBlacklistUsers(blacklistUsers);
+
+    const payload = {
+      username: 'Blacklist Notifier',
+      content: `**${message.author.id}** has been blacklisted for deleting their message.`
+    };
+
+    try {
+      const response = await fetch(webhookURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) console.log(`User ${message.author.id} blacklisted.`);
+    } catch (err) {
+      console.error("Error sending to webhook:", err);
+    }
+  }
+});
+
+client.login('YOUR DISCORD ACCOUNT TOKEN'); // Replace with your actual token
