@@ -1,0 +1,123 @@
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v10');
+const fs = require('fs');
+require('dotenv').config(); // Load .env for bot token
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
+    ]
+});
+
+const TOKEN = process.env.TOKEN; // Your bot token
+const CLIENT_ID = process.env.CLIENT_ID; // Your bot client ID
+const GUILD_ID = process.env.GUILD_ID; // Your server ID
+
+const allowedRoleId = '1355017293771444242'; // Only this role can use the command
+const wordFilePath = './blacklistword.json';
+const userFilePath = './blacklistuser.json';
+
+// Load and save blacklist functions
+function loadBlacklist(filePath) {
+    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, JSON.stringify([]));
+    return JSON.parse(fs.readFileSync(filePath));
+}
+
+function saveBlacklist(filePath, data) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+// Slash command data
+const commands = [
+    {
+        name: 'blacklist',
+        description: 'Manage the blacklist',
+        options: [
+            {
+                name: 'action',
+                type: 3, // String
+                description: 'Choose add or remove',
+                required: true,
+                choices: [
+                    { name: 'Add', value: 'add' },
+                    { name: 'Remove', value: 'remove' }
+                ]
+            },
+            {
+                name: 'type',
+                type: 3, // String
+                description: 'Choose word or user',
+                required: true,
+                choices: [
+                    { name: 'Word', value: 'word' },
+                    { name: 'User', value: 'user' }
+                ]
+            },
+            {
+                name: 'keyword',
+                type: 3, // String
+                description: 'Enter the word or user ID',
+                required: true
+            }
+        ]
+    }
+];
+
+// Register commands
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+(async () => {
+    try {
+        console.log('Registering slash commands...');
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        console.log('✅ Slash commands registered!');
+    } catch (error) {
+        console.error('Error registering commands:', error);
+    }
+})();
+
+// Command handling
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand()) return;
+
+    if (interaction.commandName === 'blacklist') {
+        // Role restriction check
+        if (!interaction.member.roles.cache.has(allowedRoleId)) {
+            return interaction.reply({ content: '❌ **You do not have permission to use this command.**', ephemeral: true });
+        }
+
+        const action = interaction.options.getString('action');
+        const type = interaction.options.getString('type');
+        const keyword = interaction.options.getString('keyword');
+
+        const filePath = type === 'word' ? wordFilePath : userFilePath;
+        let blacklist = loadBlacklist(filePath);
+
+        if (action === 'add') {
+            if (blacklist.includes(keyword.toLowerCase())) {
+                return interaction.reply({ content: `❌ **"${keyword}" is already blacklisted.**`, ephemeral: true });
+            }
+            blacklist.push(keyword.toLowerCase());
+            saveBlacklist(filePath, blacklist);
+            return interaction.reply({ content: `✅ **"${keyword}" has been blacklisted.**`, ephemeral: true });
+        } else {
+            if (!blacklist.includes(keyword.toLowerCase())) {
+                return interaction.reply({ content: `❌ **"${keyword}" is not in the blacklist.**`, ephemeral: true });
+            }
+            blacklist = blacklist.filter(item => item !== keyword.toLowerCase());
+            saveBlacklist(filePath, blacklist);
+            return interaction.reply({ content: `✅ **"${keyword}" has been removed from the blacklist.**`, ephemeral: true });
+        }
+    }
+});
+
+// Bot login
+client.once('ready', () => {
+    console.log(`✅ Logged in as ${client.user.tag}!`);
+});
+
+client.login(TOKEN);
+
