@@ -126,7 +126,7 @@ client.on('messageCreate', async (message) => {
         color: 0x2e7d32, // Adjust as needed
         title: `Glitch Detected`,
         thumbnail: {
-          url: 'https://raw.githubusercontent.com/MOBILERVERISON/Glitch-pfp/refs/heads/main/GLITCHED.webp' // Your thumbnail URL
+          url: 'https://raw.githubusercontent.com/eternals924/Glitch-Dreamspace-sniper/refs/heads/main/GLITCHED.webp' // Your thumbnail URL
         },
         fields: [
           {
