@@ -46,3 +46,5 @@ npm install discord.js
 You can get your server ID easily.
 
 Now, run the glitch and dream snipers, as well as the blacklist bot. That's all! Thank you for reading.
+
+Developer's Discord user: aa09470
